@@ -1,0 +1,63 @@
+# .gitignore para Projeto RAG com Gemini + FAISS + Streamlit
+
+# Ambientes Virtuais
+venv/
+.env/
+*.env
+*.venv
+generative/
+
+# Cache do Python
+__pycache__/
+*.py[cod]
+
+# Arquivos de Configuração do Sistema
+.DS_Store
+Thumbs.db
+
+# Logs e Arquivos Temporários
+*.log
+*.tmp
+*.bak
+
+# Credenciais Google Cloud
+credentials.json
+
+# Arquivos do Streamlit
+.streamlit/
+
+# Dependências
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Arquivos de IDEs
+.vscode/
+.idea/
+
+# Arquivos do Jupyter
+.ipynb_checkpoints/
+
+# Arquivos do Git
+*.lock
+
+# Arquivos de Debug
+*.log
+
+# Arquivos de Compilação
+*.so
+*.dll
+*.dylib
+*.bin
+
+# Arquivos de Testes
+.coverage
+.nox/
+*.test
+*.tox
+
+# Arquivos do FAISS
+faiss_index/
+
+# Pastas de Upload
+uploads/
+temp/credentials.json
