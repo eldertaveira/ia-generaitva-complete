@@ -1,31 +1,45 @@
+import pandas as pd
 from PyPDF2 import PdfReader
 from langchain.text_splitter import CharacterTextSplitter
 
-
-# Função process_files recebe os documentos carregados realiza a extração do texto do PDFs
 def process_files(files):
-
-    text = ""
+    """
+    Processa arquivos PDF, CSV e Excel. Retorna:
+    - 'text_data': Texto extraído dos PDFs.
+    - 'table_data': Dicionário contendo DataFrames de arquivos CSV e Excel.
+    """
+    text_data = ""
+    table_data = {}
 
     for file in files:
-        pdf = PdfReader(file)
+        filename = file.name.lower()
 
-        # iterar por cada pagina e  pegar todo o texto e transforma em string
-        for page in pdf.pages:
-            text += page.extract_text()
-    
-    return text
+        if filename.endswith('.pdf'):
+            pdf = PdfReader(file)
+            for page in pdf.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text_data += page_text + "\n"
+
+        elif filename.endswith('.csv'):
+            df = pd.read_csv(file)
+            table_data[filename] = df  # Armazena o DataFrame
+
+        elif filename.endswith('.xls') or filename.endswith('.xlsx'):
+            df = pd.read_excel(file)
+            table_data[filename] = df  # Armazena o DataFrame
+
+    return text_data, table_data
 
 
-# a Função create_text_chunks particiona o texto extraido em textos menores
 def create_text_chunks(text):
+    """
+    Divide o texto em partes menores para melhor processamento do chatbot.
+    """
     text_splitter = CharacterTextSplitter(
-        separator = '\n',       # Caractere usado para dividir os textos
-        chunk_size = 8000,      # Descrevem o tamanho máximo que um único pedaço de chunk pode ter
-        chunk_overlap = 1000,    # Quantidade de caracteres que sobrepos um chunck de outro
-        length_function = len
+        separator='\n',
+        chunk_size=8000,
+        chunk_overlap=1000,
+        length_function=len
     )
-    chunks = text_splitter.split_text(text)
-
-    return chunks
-
+    return text_splitter.split_text(text)

@@ -1,53 +1,90 @@
 import streamlit as st
-
 from utils import chatbot, text
 from streamlit_chat import message
 
+
 def main():
-    
-    st.set_page_config(
-        page_title='ChatPDF TRE-RN', 
-        page_icon=':books:'
-    )
 
-    st.header('Chat PDF TRE-RN')
-    user_question = st.text_input("Pergunte alguma coisa", placeholder="Escreva aqui...")
+    st.set_page_config(page_title='Chat com Arquivos', page_icon=':books:')
+    st.header('Chat com PDFs e Tabelas')
 
-    if('conversation' not in st.session_state): # Armazen as variáveis dentro de um estado de sessão
+    # Inicializa variáveis de sessão
+    if 'conversation' not in st.session_state:
         st.session_state.conversation = None
-    
-     # Inserindo as mensagens do usario dentro da nossa interface
-    if(user_question):
-        response = st.session_state.conversation(user_question) ['chat_history']
+    if 'table_data' not in st.session_state:
+        st.session_state.table_data = None
 
-        for i, text_message in enumerate(response):
+    user_question = st.text_input(
+        "Pergunte algo sobre os arquivos", placeholder="Escreva aqui...")
 
-            if(i % 2 == 0):
-                message(text_message.content, is_user=True, key=str(i) + '_user')
-            else:
-                message(text_message.content, is_user=False, key=str(i) + '_bot')
+    if user_question:
+        # Se houver PDFs processados, usamos a busca semântica com FAISS
+        if st.session_state.conversation:
+            response = st.session_state.conversation(
+                {'question': user_question})
+            if 'chat_history' in response:
+                for i, text_message in enumerate(response['chat_history']):
+                    message(text_message.content, is_user=(
+                        i % 2 == 0), key=f"{i}_msg")
 
-    # adicionar interatividade ao seu aplicativo e organizá em uma barra lateral. 
+        # Se houver tabelas carregadas, analisamos com o LLM
+        elif st.session_state.table_data:
+            selected_table = st.selectbox(
+                "Escolha a tabela para análise", list(st.session_state.table_data.keys()))
+            df = st.session_state.table_data[selected_table]
+
+            response = chatbot.analyze_table(df, user_question)
+            # Extrai apenas o conteúdo relevante da resposta
+            if isinstance(response, str):  
+                resposta_final = response  # Se já for string, usa diretamente
+            elif isinstance(response, dict):  
+                resposta_final = response.get("content", "Não foi possível obter uma resposta.")
+            elif hasattr(response, "content"):  
+                resposta_final = getattr(response, "content", "Não foi possível obter uma resposta.")
+            else:  
+                resposta_final = str(response)  # Converte qualquer outro tipo para string
+
+            # Agora garantimos que só o texto será exibido, sem metadados extras
+            st.write("Resposta:")
+            st.write(resposta_final)
+
+
     with st.sidebar:
         st.subheader('Seus Arquivos')
 
-        # accept_multiple_files=True, permite que o usuário carregue vários arquivos ao mesmo tempo.
-        # st.file_uploader - Exibir um widget de upload de arquivo carregados limitados a 200 MB. 
-        pdf_docs = st.file_uploader("Carregue seus arquivos em formato PDF aqui !", accept_multiple_files=True)
+        pdf_docs = st.file_uploader(
+            "Carregue seus arquivos (PDF, CSV, Excel)",
+            type=["pdf", "csv", "xls", "xlsx"],
+            accept_multiple_files=True
+        )
 
-        if st.button('PROCESSAR'):
+        if st.button('PROCESSAR') and pdf_docs:
+            try:
+                text_data, table_data = text.process_files(pdf_docs)
 
-            # Chama a função process_files e passa pra ela os documentos carregados pelo file_uploader
-            all_files_text = text.process_files(pdf_docs)
-            
-            #Chama função create_text_chunks com os textos dos documentos e recebe os chunks
-            chunks = text.create_text_chunks(all_files_text)
+                # Se houver PDFs, processamos para FAISS
+                if text_data:
+                    chunks = text.create_text_chunks(text_data)
+                    vectorstore = chatbot.create_vectorstore(chunks)
+                    st.session_state.conversation = chatbot.create_conversation_chain(
+                        vectorstore)
 
-            #criando o Vectorstore para armazenar os vetores de embeddings das partes do texto (chunks)
-            vectorstore = chatbot.create_vectorstore(chunks)
+                # Se houver tabelas, armazenamos
+                if table_data:
+                    st.session_state.table_data = table_data
 
-            # Cria e armazena uma conversa (conversation) na sessão do Streamlit usando o chatbot.
-            st.session_state.conversation = chatbot.create_conversation_chain(vectorstore)
+                st.success("Processamento concluído! Faça sua pergunta.")
+
+            except Exception as e:
+                st.error(f"Erro ao processar arquivos: {str(e)}")
+
+        # 🔴 BOTÃO DE REINICIAR 🔴 (Agora na parte inferior da tela)
+        st.markdown("---")  # Linha separadora para organizar a sidebar
+        if st.button("🔄 Reiniciar Aplicação"):
+            st.session_state.conversation = None
+            st.session_state.table_data = None
+            st.rerun()  # Usa a versão mais recente do Streamlit para recarregar a aplicação
+
 
 if __name__ == '__main__':
     main()
